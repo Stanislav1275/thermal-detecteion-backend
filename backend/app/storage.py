@@ -1,6 +1,3 @@
-"""
-Локальное файловое хранилище задач обработки.
-"""
 
 import json
 import uuid
@@ -11,7 +8,6 @@ from .models import ImageResult
 
 
 class JobStorage:
-    """Хранилище задач обработки изображений."""
     
     def __init__(self, base_dir: str = "jobs"):
         self.base_dir = Path(base_dir)
@@ -23,7 +19,6 @@ class JobStorage:
         confidence_threshold: float = 0.5,
         total_images: int = 0
     ) -> str:
-        """Создает новую задачу обработки."""
         if job_id is None:
             job_id = str(uuid.uuid4())
         
@@ -49,7 +44,6 @@ class JobStorage:
         return job_id
     
     def save_image(self, job_id: str, filename: str, image_data: bytes, is_input: bool = True):
-        """Сохраняет изображение (входное или выходное)."""
         job_dir = self.base_dir / job_id
         subdir = "input" if is_input else "output"
         file_path = job_dir / subdir / filename
@@ -58,7 +52,6 @@ class JobStorage:
             f.write(image_data)
     
     def save_detections(self, job_id: str, detections: list):
-        """Сохраняет результаты детекции в JSON."""
         job_dir = self.base_dir / job_id
         detections_path = job_dir / "detections.json"
         
@@ -71,7 +64,7 @@ class JobStorage:
                         {
                             "bbox": det.bbox,
                             "confidence": det.confidence,
-                            "class": getattr(det, 'class')
+                            "class": getattr(det, 'class_name', 'person')
                         }
                         for det in img.detections
                     ],
@@ -91,7 +84,6 @@ class JobStorage:
         processed_images: Optional[int] = None,
         images_with_detections: Optional[int] = None
     ):
-        """Обновляет статус задачи."""
         manifest = self._load_manifest(job_id)
         if manifest is None:
             return
@@ -110,11 +102,9 @@ class JobStorage:
         self._save_manifest(job_id, manifest)
     
     def get_status(self, job_id: str) -> Optional[Dict]:
-        """Возвращает статус задачи."""
         return self._load_manifest(job_id)
     
     def get_detections(self, job_id: str) -> Optional[list]:
-        """Возвращает результаты детекции."""
         job_dir = self.base_dir / job_id
         detections_path = job_dir / "detections.json"
         
@@ -125,7 +115,6 @@ class JobStorage:
             return json.load(f)
     
     def get_output_image_path(self, job_id: str, filename: str) -> Optional[Path]:
-        """Возвращает путь к обработанному изображению."""
         job_dir = self.base_dir / job_id
         image_path = job_dir / "output" / filename
         
@@ -134,7 +123,6 @@ class JobStorage:
         return None
     
     def _load_manifest(self, job_id: str) -> Optional[Dict]:
-        """Загружает manifest задачи."""
         job_dir = self.base_dir / job_id
         manifest_path = job_dir / "manifest.json"
         
@@ -145,7 +133,6 @@ class JobStorage:
             return json.load(f)
     
     def _save_manifest(self, job_id: str, manifest: Dict):
-        """Сохраняет manifest задачи."""
         job_dir = self.base_dir / job_id
         manifest_path = job_dir / "manifest.json"
         

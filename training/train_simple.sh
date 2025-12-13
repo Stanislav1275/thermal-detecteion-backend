@@ -1,12 +1,17 @@
 #!/bin/bash
-# Простой запуск обучения
-
 set -e
 
-EPOCHS=${1:-100}  # По умолчанию 100 эпох, можно указать другое: ./train_simple.sh 50
+EPOCHS=${1:-100}
 
-echo "🚀 Запуск обучения модели..."
-echo "   Эпохи: $EPOCHS"
+if command -v conda &> /dev/null && conda info --envs | grep -q "thermal-detection"; then
+    source "$(conda info --base)/etc/profile.d/conda.sh"
+    conda activate thermal-detection
+elif [ -d "../backend/venv" ]; then
+    source ../backend/venv/bin/activate
+fi
+
+echo "Запуск обучения модели..."
+echo "Эпохи: $EPOCHS"
 echo ""
 
 python train.py \
@@ -14,9 +19,8 @@ python train.py \
     --model n \
     --epochs $EPOCHS \
     --batch 16 \
-    --imgsz 640
+    --imgsz 416
 
 echo ""
-echo "✅ Обучение завершено!"
-echo "   Модель сохранена в: training/models/best.pt"
+echo "✅ Обучение завершено! Модель сохранена в: models/best.pt"
 

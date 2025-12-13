@@ -155,6 +155,118 @@ python validate.py \
 - Precision: ≥ 0.75
 - Recall: ≥ 0.70
 
+## Что делать после обучения
+
+После завершения обучения модели выполните следующие шаги:
+
+### Шаг 1: Валидация и интеграция модели
+
+Запустите автоматический скрипт валидации и интеграции:
+
+```bash
+bash post_training.sh
+```
+
+Этот скрипт:
+- Найдет обученную модель
+- Скопирует её в стандартное место для backend (`training/models/best.pt`)
+- Запустит валидацию на тестовом наборе
+- Покажет метрики качества (mAP, precision, recall)
+- Создаст визуализации предсказаний
+
+### Шаг 2: Проверка готовности модели
+
+Проверьте, что модель готова к использованию:
+
+```bash
+python check_model.py
+```
+
+Скрипт проверит:
+- Существование и корректность файла модели
+- Успешную загрузку модели
+- Работоспособность инференции
+- Наличие необходимых классов (person, car)
+- Совместимость с backend
+
+### Шаг 3: Запуск backend API
+
+После успешной валидации запустите backend:
+
+```bash
+cd ../backend
+python -m uvicorn app.main:app --reload
+```
+
+Backend автоматически загрузит модель из `training/models/best.pt`.
+
+### Шаг 4: Тестирование API
+
+В другом терминале протестируйте API:
+
+```bash
+# Проверка здоровья API
+python test_api.py
+
+# Или с изображением
+python test_api.py path/to/test_image.jpg
+```
+
+### Использование API
+
+#### Загрузка изображений для обработки
+
+```bash
+curl -X POST "http://localhost:8000/api/upload" \
+  -F "files=@image1.jpg" \
+  -F "files=@image2.jpg" \
+  -F "confidence_threshold=0.5"
+```
+
+Ответ:
+```json
+{
+  "job_id": "abc123",
+  "message": "Задача создана. Обработка 2 изображений начата."
+}
+```
+
+#### Проверка статуса задачи
+
+```bash
+curl "http://localhost:8000/api/jobs/abc123"
+```
+
+#### Получение результатов
+
+```bash
+curl "http://localhost:8000/api/jobs/abc123/results"
+```
+
+#### Получение обработанного изображения
+
+```bash
+curl "http://localhost:8000/api/jobs/abc123/output/image1.jpg" -o result.jpg
+```
+
+### Ручная валидация (опционально)
+
+Если нужно запустить валидацию вручную:
+
+```bash
+python validate.py \
+    --model training/models/best.pt \
+    --data thermal.yaml \
+    --output training/results \
+    --conf 0.25 \
+    --visualize
+```
+
+Результаты сохраняются в:
+- `training/results/metrics.json` - метрики качества
+- `training/results/visualizations/` - визуализации предсказаний
+- `training/results/` - графики метрик
+
 ## Технические детали
 
 ### Устройства для обучения

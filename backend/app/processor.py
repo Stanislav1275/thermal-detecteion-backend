@@ -1,6 +1,3 @@
-"""
-Обработчик изображений для детекции людей.
-"""
 
 import os
 from pathlib import Path
@@ -11,7 +8,6 @@ from .models import ImageResult, Detection
 
 
 class ImageProcessor:
-    """Обработчик изображений для детекции людей."""
     
     def __init__(self, detector: ThermalDetector):
         self.detector = detector
@@ -22,7 +18,6 @@ class ImageProcessor:
         output_path: str,
         confidence: float = None
     ) -> ImageResult:
-        """Обрабатывает одно изображение."""
         try:
             result = self.detector.detect(
                 image_path,
@@ -35,7 +30,7 @@ class ImageProcessor:
                 detections.append(Detection(
                     bbox=det['bbox'],
                     confidence=det['confidence'],
-                    **{'class': det['class']}
+                    class_name=det.get('class_name', det.get('class', 'person'))
                 ))
             
             if result['total_detections'] > 0:
@@ -68,7 +63,6 @@ class ImageProcessor:
         confidence: float = None,
         save_only_with_detections: bool = True
     ) -> List[ImageResult]:
-        """Обрабатывает пакет изображений."""
         os.makedirs(output_dir, exist_ok=True)
         results = []
         
@@ -92,14 +86,12 @@ class ImageProcessor:
     
     @staticmethod
     def validate_image_format(file_path: str) -> bool:
-        """Проверяет поддерживаемый формат изображения."""
         supported_formats = {'.tiff', '.tif', '.png', '.jpg', '.jpeg', '.webp'}
         ext = Path(file_path).suffix.lower()
         return ext in supported_formats
     
     @staticmethod
     def load_image(file_data: bytes, filename: str, save_path: str) -> str:
-        """Сохраняет изображение из байтов на диск."""
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         
         with open(save_path, 'wb') as f:

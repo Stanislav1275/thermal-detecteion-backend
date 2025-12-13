@@ -180,6 +180,7 @@ curl "http://localhost:8000/api/jobs/{job_id}/output/{filename}" --output result
 - [QUICKSTART.md](QUICKSTART.md) - Подробная инструкция по быстрому старту
 - [training/README.md](training/README.md) - Документация по обучению модели
 - [DOCKER.md](DOCKER.md) - Инструкции по использованию Docker
+- [USE_CASES.md](USE_CASES.md) - Use-case-ы проекта с точки зрения пользователя
 
 ## Docker
 

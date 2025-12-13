@@ -1,7 +1,3 @@
-"""
-YOLO детектор для детекции людей на тепловизионных изображениях.
-"""
-
 import os
 from typing import List, Dict, Optional
 import torch
@@ -10,7 +6,6 @@ import cv2
 
 
 class ThermalDetector:
-    """Детектор людей на тепловизионных изображениях с использованием YOLOv8."""
     
     def __init__(
         self,
@@ -58,7 +53,6 @@ class ThermalDetector:
         confidence: Optional[float] = None,
         return_image: bool = False
     ) -> Dict:
-        """Детектирует людей на изображении."""
         if confidence is None:
             confidence = self.confidence_threshold
         
@@ -89,7 +83,7 @@ class ThermalDetector:
                     detections.append({
                         'bbox': [int(x1), int(y1), int(x2), int(y2)],
                         'confidence': conf_float,
-                        'class': 'person'
+                        'class_name': 'person'
                     })
         
         result_dict = {
@@ -122,7 +116,6 @@ class ThermalDetector:
         image_paths: List[str],
         confidence: Optional[float] = None
     ) -> List[Dict]:
-        """Детектирует людей на нескольких изображениях."""
         results = []
         for img_path in image_paths:
             try:

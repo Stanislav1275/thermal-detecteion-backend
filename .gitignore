@@ -43,6 +43,25 @@ training/datasets/
 
 # Jobs (temporary storage)
 jobs/
+backend/jobs/
+
+# Images
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.tif
+*.webp
+*.svg
+!training/results/plots/.gitkeep
+
+# Training results
+training/results/plots/*.png
+training/results/plots/*.jpg
+training/training/runs/
+training/runs/detect/
 
 # IDE
 .vscode/
@@ -59,14 +78,6 @@ Thumbs.db
 .env
 .env.local
 
-# Training results (keep structure but ignore large files)
-training/results/plots/*.png
-training/results/plots/*.jpg
-!training/results/plots/.gitkeep
-
 # Logs
 *.log
-.idea
-.idea/*
-.idea/**
 logs/

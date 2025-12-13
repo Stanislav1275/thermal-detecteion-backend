@@ -1,7 +1,3 @@
-"""
-FastAPI приложение для детекции людей на тепловизионных изображениях.
-"""
-
 import os
 from pathlib import Path
 from typing import List
@@ -28,7 +24,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_PATH = os.getenv("MODEL_PATH", "training/models/best.pt")
+_default_model_path = "training/models/best.pt"
+if not os.path.exists(_default_model_path):
+    _alt_path = "../training/models/best.pt"
+    if os.path.exists(_alt_path):
+        _default_model_path = _alt_path
+
+MODEL_PATH = os.getenv("MODEL_PATH", _default_model_path)
 STORAGE_BASE_DIR = os.getenv("STORAGE_DIR", "jobs")
 
 detector = None
@@ -38,24 +40,25 @@ storage = JobStorage(base_dir=STORAGE_BASE_DIR)
 
 @app.on_event("startup")
 async def startup_event():
-    """Инициализация детектора при запуске."""
     global detector, processor
     
     try:
         if not os.path.exists(MODEL_PATH):
-            print(f"Предупреждение: Модель не найдена по пути {MODEL_PATH}")
-            print("Убедитесь, что модель обучена и сохранена в training/models/best.pt")
-        else:
-            detector = ThermalDetector(model_path=MODEL_PATH)
-            processor = ImageProcessor(detector=detector)
-            print("Детектор инициализирован")
+            print(f"⚠️  Модель не найдена: {MODEL_PATH}")
+            return
+        
+        print(f"Загрузка модели: {os.path.abspath(MODEL_PATH)}")
+        detector = ThermalDetector(model_path=MODEL_PATH)
+        processor = ImageProcessor(detector=detector)
+        print("✅ Детектор инициализирован")
     except Exception as e:
-        print(f"Ошибка инициализации детектора: {e}")
+        import traceback
+        print(f"❌ Ошибка инициализации: {e}")
+        traceback.print_exc()
 
 
 @app.get("/")
 async def root():
-    """Корневой эндпоинт."""
     return {
         "message": "Thermal Person Detection API",
         "version": "1.0.0",
@@ -65,7 +68,6 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Проверка состояния API."""
     model_loaded = detector is not None and processor is not None
     return {
         "status": "healthy" if model_loaded else "degraded",
@@ -79,19 +81,13 @@ async def upload_images(
     files: List[UploadFile] = File(...),
     confidence_threshold: float = 0.5
 ):
-    """Загружает изображения для обработки."""
     if detector is None or processor is None:
         raise HTTPException(
             status_code=503,
-            detail="Детектор не инициализирован. Убедитесь, что модель обучена."
+            detail="Детектор не инициализирован"
         )
     
-    valid_files = []
-    for file in files:
-        if processor.validate_image_format(file.filename):
-            valid_files.append(file)
-        else:
-            print(f"Неподдерживаемый формат: {file.filename}")
+    valid_files = [f for f in files if processor.validate_image_format(f.filename)]
     
     if not valid_files:
         raise HTTPException(
@@ -122,7 +118,6 @@ async def process_images_task(
     files: List[UploadFile],
     confidence_threshold: float
 ):
-    """Фоновая обработка изображений."""
     global detector, processor
     
     try:
@@ -190,36 +185,25 @@ async def process_images_task(
 
 @app.get("/api/jobs/{job_id}", response_model=JobStatus)
 async def get_job_status(job_id: str):
-    """Возвращает статус задачи."""
     status = storage.get_status(job_id)
-    
     if status is None:
         raise HTTPException(status_code=404, detail="Задача не найдена")
-    
     return JobStatus(**status)
 
 
 @app.get("/api/jobs/{job_id}/results", response_model=JobResults)
 async def get_job_results(job_id: str):
-    """Возвращает результаты обработки (только изображения с детекциями людей)."""
     status = storage.get_status(job_id)
-    
     if status is None:
         raise HTTPException(status_code=404, detail="Задача не найдена")
     
-    detections = storage.get_detections(job_id)
+    detections = storage.get_detections(job_id) or []
     
-    if detections is None:
-        detections = []
-    
+    from .models import Detection
     image_results = []
     for det in detections:
-        from .models import Detection
-        detections_list = [
-            Detection(**d) for d in det.get('detections', [])
-        ]
-        
-        if len(detections_list) > 0:
+        detections_list = [Detection(**d) for d in det.get('detections', [])]
+        if detections_list:
             image_results.append(ImageResult(
                 filename=det['filename'],
                 detections=detections_list,
@@ -233,26 +217,15 @@ async def get_job_results(job_id: str):
         "status": status['status']
     }
     
-    return JobResults(
-        job_id=job_id,
-        images=image_results,
-        metadata=metadata
-    )
+    return JobResults(job_id=job_id, images=image_results, metadata=metadata)
 
 
 @app.get("/api/jobs/{job_id}/output/{filename}")
 async def get_output_image(job_id: str, filename: str):
-    """Возвращает обработанное изображение."""
     image_path = storage.get_output_image_path(job_id, filename)
-    
     if image_path is None:
         raise HTTPException(status_code=404, detail="Изображение не найдено")
-    
-    return FileResponse(
-        str(image_path),
-        media_type="image/jpeg",
-        filename=filename
-    )
+    return FileResponse(str(image_path), media_type="image/jpeg", filename=filename)
 
 
 if __name__ == "__main__":
