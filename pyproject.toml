@@ -56,6 +56,7 @@ addopts = [
 markers = [
     "unit: Unit tests",
     "integration: Integration tests",
+    "load: Load and performance tests",
 ]
 
 [tool.coverage.run]

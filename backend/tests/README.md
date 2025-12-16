@@ -9,8 +9,10 @@ tests/
 │   ├── test_detector.py
 │   ├── test_processor.py
 │   └── test_storage.py
-└── integration/         # Integration тесты
-    └── test_api.py
+├── integration/         # Integration тесты
+│   └── test_api.py
+└── load/                # Нагрузочные тесты
+    └── test_load.py
 ```
 
 ## Запуск тестов
@@ -41,6 +43,15 @@ python -m pytest tests/ -v --cov=app --cov-report=html
 ### Конкретный тест
 ```bash
 python -m pytest tests/unit/test_storage.py::test_create_job_with_unique_name -v
+```
+
+### Нагрузочные тесты
+```bash
+# Все нагрузочные тесты
+python -m pytest tests/load/ -v -s -m load
+
+# Конкретный нагрузочный тест
+python -m pytest tests/load/test_load.py::test_concurrent_health_checks -v -s
 ```
 
 ## Фикстуры

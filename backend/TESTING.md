@@ -28,6 +28,14 @@ cd backend
 python -m pytest tests/integration/ -v
 ```
 
+### 只运行负载测试
+```bash
+cd backend
+python -m pytest tests/load/ -v -s
+```
+
+`-s` 参数用于显示测试中的打印输出（性能指标）。
+
 ### 运行特定测试文件
 ```bash
 cd backend
@@ -138,6 +146,64 @@ python -m pytest tests/ -v
 # 3. 检查代码覆盖率
 python -m pytest tests/ -v --cov=app --cov-report=term-missing
 ```
+
+## 负载测试
+
+负载测试用于评估API在高并发情况下的性能表现。
+
+### 运行所有负载测试
+```bash
+cd backend
+python -m pytest tests/load/ -v -s
+```
+
+### 运行特定负载测试
+```bash
+cd backend
+# 并发健康检查测试
+python -m pytest tests/load/test_load.py::test_concurrent_health_checks -v -s
+
+# 压力测试
+python -m pytest tests/load/test_load.py::test_stress_test_health_endpoint -v -s
+
+# 混合负载测试
+python -m pytest tests/load/test_load.py::test_mixed_workload -v -s
+```
+
+### 负载测试包含的场景
+
+1. **并发健康检查** (`test_concurrent_health_checks`)
+   - 50个并发请求
+   - 测试健康检查端点的吞吐量
+
+2. **并发根端点** (`test_concurrent_root_endpoint`)
+   - 100个并发请求
+   - 测试根端点的性能
+
+3. **并发任务状态查询** (`test_concurrent_job_status_queries`)
+   - 50个并发查询请求
+   - 测试任务状态查询的性能
+
+4. **并发图片上传** (`test_concurrent_image_uploads`)
+   - 20个并发上传，限制5个同时进行
+   - 测试图片上传的并发处理能力
+
+5. **混合负载** (`test_mixed_workload`)
+   - 混合多种操作（健康检查、查询、上传）
+   - 模拟真实使用场景
+
+6. **压力测试** (`test_stress_test_health_endpoint`)
+   - 200个请求，分批处理
+   - 测试系统在高负载下的稳定性
+
+### 性能指标
+
+负载测试会输出以下性能指标：
+- **总请求数**: 发送的请求总数
+- **成功请求**: 成功响应的请求数
+- **总耗时**: 完成所有请求的总时间
+- **吞吐量**: 每秒处理的请求数（RPS）
+- **成功率**: 成功请求的百分比
 
 ## 常见问题
 
