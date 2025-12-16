@@ -18,6 +18,7 @@ class ImageResult(BaseModel):
 
 class JobStatus(BaseModel):
     job_id: str = Field(..., description="ID задачи")
+    name: Optional[str] = Field(default=None, description="Имя задачи")
     status: str = Field(..., description="Статус: queued, processing, completed, failed")
     total_images: int = Field(default=0, description="Всего изображений")
     processed_images: int = Field(default=0, description="Обработано изображений")
@@ -36,4 +37,8 @@ class JobResults(BaseModel):
 class UploadResponse(BaseModel):
     job_id: str = Field(..., description="ID созданной задачи")
     message: str = Field(default="Задача создана", description="Сообщение")
+
+
+class UpdateJobNameRequest(BaseModel):
+    name: str = Field(..., description="Новое имя задачи")
 

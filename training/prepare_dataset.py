@@ -56,13 +56,10 @@ def convert_coco_to_yolo(
     os.makedirs(labels_dir, exist_ok=True)
     os.makedirs(images_output_dir, exist_ok=True)
     
-    # Этап 1: Загрузка COCO JSON файла
     print(f"Загрузка аннотаций из {json_path}...")
     with open(json_path, 'r') as f:
         data = json.load(f)
     
-    # Этап 2: Создание маппингов для быстрого доступа
-    # Маппинг image_id -> информация об изображении (имя файла, размеры)
     image_id_to_info = {}
     for img in data['images']:
         image_id_to_info[img['id']] = {
@@ -71,10 +68,8 @@ def convert_coco_to_yolo(
             'height': img['height']
         }
     
-    # Маппинг category_id -> название класса
     category_id_to_name = {cat['id']: cat['name'] for cat in data['categories']}
     
-    # Этап 3: Обработка аннотаций и конвертация в YOLO формат
     labels = defaultdict(list)
     skipped_small = 0
     skipped_aspect = 0
@@ -103,20 +98,15 @@ def convert_coco_to_yolo(
             skipped_aspect += 1
             continue
         
-        # Этап 4: Конвертация координат из COCO в YOLO формат
-        # COCO: [x, y, width, height] - абсолютные координаты, x,y - левый верхний угол
-        # YOLO: [x_center, y_center, width, height] - нормализованные координаты (0.0-1.0)
-        x_center = (x + w/2) / img_w  # Центр по X, нормализованный
-        y_center = (y + h/2) / img_h  # Центр по Y, нормализованный
-        w_norm = w / img_w  # Ширина, нормализованная
-        h_norm = h / img_h  # Высота, нормализованная
+        x_center = (x + w/2) / img_w
+        y_center = (y + h/2) / img_h
+        w_norm = w / img_w
+        h_norm = h / img_h
         
         labels[img_id].append(
             f"{class_map[cat_name]} {x_center:.6f} {y_center:.6f} {w_norm:.6f} {h_norm:.6f}"
         )
     
-    # Этап 5: Сохранение меток и копирование изображений
-    # Для каждого изображения создается файл .txt с метками в формате YOLO
     copied_images = 0
     for img_id, info in image_id_to_info.items():
         file_name = os.path.basename(info['file_name'])
@@ -125,12 +115,10 @@ def convert_coco_to_yolo(
         img_src_path = os.path.join(images_dir, info['file_name'])
         img_dst_path = os.path.join(images_output_dir, file_name)
         
-        # Запись меток
         with open(txt_path, 'w') as f:
             if img_id in labels:
                 f.write("\n".join(labels[img_id]) + "\n")
             else:
-                # Пустой файл для изображений без объектов нужных классов
                 f.write("")
         
         # Копирование изображений
@@ -181,8 +169,6 @@ def prepare_flir_dataset(
             dataset_root, 
             f"FLIR_ADAS_1_3/{split}/thermal_annotations.json"
         )
-        # Путь к изображениям: в JSON file_name содержит "thermal_8_bit/FLIR_XXXXX.jpeg"
-        # Изображения находятся в FLIR_ADAS_1_3/{split}/thermal_8_bit/
         images_dir = os.path.join(
             dataset_root,
             f"FLIR_ADAS_1_3/{split}"

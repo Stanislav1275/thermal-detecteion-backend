@@ -18,7 +18,6 @@ def check_model_readiness(model_path: str = None):
     print("═══════════════════════════════════════════════════════════")
     print("")
     
-    # Автоматический поиск модели, если путь не указан
     if model_path is None:
         possible_paths = [
             "models/best.pt",
@@ -26,7 +25,6 @@ def check_model_readiness(model_path: str = None):
             "models/best_thermal_m4.pt",
         ]
         
-        # Также ищем в последнем запуске
         runs_dirs = ["training/runs", "runs"]
         for runs_dir in runs_dirs:
             if os.path.exists(runs_dir):
@@ -51,7 +49,6 @@ def check_model_readiness(model_path: str = None):
     checks_passed = 0
     total_checks = 5
     
-    # Проверка 1: Существование файла
     print("1. Проверка существования файла модели...")
     if os.path.exists(model_path):
         file_size = os.path.getsize(model_path) / (1024 * 1024)  # MB
@@ -67,7 +64,6 @@ def check_model_readiness(model_path: str = None):
         return False
     print("")
     
-    # Проверка 2: Загрузка модели
     print("2. Проверка загрузки модели...")
     try:
         model = YOLO(model_path)
@@ -84,11 +80,8 @@ def check_model_readiness(model_path: str = None):
         import numpy as np
         from PIL import Image
         
-        # Создаем тестовое изображение правильного формата (HWC, uint8)
-        # YOLOv8 ожидает изображение в формате (height, width, channels) или PIL Image
         test_image = np.random.randint(0, 255, (416, 416, 3), dtype=np.uint8)
         
-        # Определяем устройство
         if torch.backends.mps.is_available():
             device = "mps"
         elif torch.cuda.is_available():
@@ -96,7 +89,6 @@ def check_model_readiness(model_path: str = None):
         else:
             device = "cpu"
         
-        # Тестовая инференция
         results = model.predict(
             test_image,
             conf=0.25,
@@ -113,7 +105,6 @@ def check_model_readiness(model_path: str = None):
         return False
     print("")
     
-    # Проверка 4: Наличие необходимых классов
     print("4. Проверка классов модели...")
     class_names = model.names
     required_classes = ['person', 'car']
@@ -133,7 +124,6 @@ def check_model_readiness(model_path: str = None):
         print("   Модель может работать некорректно с backend")
     print("")
     
-    # Проверка 5: Совместимость с backend
     print("5. Проверка совместимости с backend...")
     backend_model_paths = ["models/best.pt", "training/models/best.pt"]
     backend_found = False
@@ -147,7 +137,6 @@ def check_model_readiness(model_path: str = None):
                     checks_passed += 1
                     break
             except OSError:
-                # samefile может не работать на некоторых системах
                 if os.path.abspath(model_path) == os.path.abspath(backend_path):
                     print(f"   ✓ Модель находится в стандартном месте для backend: {backend_path}")
                     backend_found = True
@@ -161,7 +150,6 @@ def check_model_readiness(model_path: str = None):
         print("   Запустите: bash post_training.sh для копирования модели")
     print("")
     
-    # Итоговый результат
     print("═══════════════════════════════════════════════════════════")
     if checks_passed == total_checks:
         print("✅ ВСЕ ПРОВЕРКИ ПРОЙДЕНЫ!")

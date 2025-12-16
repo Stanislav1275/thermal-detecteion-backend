@@ -9,10 +9,14 @@ class ThermalDetector:
     
     def __init__(
         self,
-        model_path: str = "training/models/best.pt",
-        confidence_threshold: float = 0.5,
+        model_path: str = None,
+        confidence_threshold: float = None,
         device: Optional[str] = None
     ):
+        if model_path is None:
+            model_path = os.getenv("MODEL_PATH", "training/models/best.pt")
+        if confidence_threshold is None:
+            confidence_threshold = float(os.getenv("DEFAULT_CONFIDENCE_THRESHOLD", "0.5"))
         self.confidence_threshold = confidence_threshold
         
         if device is None:
@@ -59,32 +63,50 @@ class ThermalDetector:
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Изображение не найдено: {image_path}")
         
-        results = self.model.predict(
-            image_path,
-            conf=confidence,
-            device=self.device,
-            verbose=False
-        )
+        img = cv2.imread(image_path)
+        if img is None:
+            raise ValueError(f"Не удалось прочитать изображение: {image_path}. Возможно, файл поврежден или имеет неподдерживаемый формат.")
+        
+        if img.size == 0:
+            raise ValueError(f"Изображение пустое: {image_path}")
+        
+        try:
+            results = self.model.predict(
+                image_path,
+                conf=confidence,
+                device=self.device,
+                verbose=False
+            )
+        except Exception as e:
+            error_msg = str(e)
+            if "need at least one array to stack" in error_msg.lower():
+                raise ValueError(f"Ошибка обработки изображения {image_path}: изображение некорректно или повреждено. Возможно, файл не является валидным изображением.")
+            raise
         
         detections = []
         result = results[0]
         
-        if result.boxes is not None:
-            for box, cls_id, conf in zip(
-                result.boxes.xyxy,
-                result.boxes.cls,
-                result.boxes.conf
-            ):
-                cls_id_int = int(cls_id)
-                conf_float = float(conf)
-                
-                if cls_id_int == self.person_class_id:
-                    x1, y1, x2, y2 = box.tolist()
-                    detections.append({
-                        'bbox': [int(x1), int(y1), int(x2), int(y2)],
-                        'confidence': conf_float,
-                        'class_name': 'person'
-                    })
+        if result.boxes is not None and len(result.boxes) > 0:
+            boxes_xyxy = result.boxes.xyxy
+            boxes_cls = result.boxes.cls
+            boxes_conf = result.boxes.conf
+            
+            if len(boxes_xyxy) > 0:
+                for box, cls_id, conf in zip(
+                    boxes_xyxy,
+                    boxes_cls,
+                    boxes_conf
+                ):
+                    cls_id_int = int(cls_id)
+                    conf_float = float(conf)
+                    
+                    if cls_id_int == self.person_class_id:
+                        x1, y1, x2, y2 = box.tolist()
+                        detections.append({
+                            'bbox': [int(x1), int(y1), int(x2), int(y2)],
+                            'confidence': conf_float,
+                            'class_name': 'person'
+                        })
         
         result_dict = {
             'detections': detections,
@@ -92,19 +114,31 @@ class ThermalDetector:
         }
         
         if return_image:
-            img = cv2.imread(image_path)
+            if img is None:
+                img = cv2.imread(image_path)
+                if img is None:
+                    raise ValueError(f"Не удалось прочитать изображение для отрисовки: {image_path}")
+            
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             
             for det in detections:
                 x1, y1, x2, y2 = det['bbox']
                 conf = det['confidence']
                 
-                cv2.rectangle(img_rgb, (x1, y1), (x2, y2), (255, 140, 0), 2)
+                bbox_color = (
+                    int(os.getenv("BBOX_COLOR_R", "255")),
+                    int(os.getenv("BBOX_COLOR_G", "140")),
+                    int(os.getenv("BBOX_COLOR_B", "0"))
+                )
+                bbox_thickness = int(os.getenv("BBOX_THICKNESS", "2"))
+                font_scale = float(os.getenv("FONT_SCALE", "0.5"))
+                
+                cv2.rectangle(img_rgb, (x1, y1), (x2, y2), bbox_color, bbox_thickness)
                 
                 label = f"person {conf:.2f}"
                 cv2.putText(
                     img_rgb, label, (x1, y1 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 140, 0), 2
+                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, bbox_color, bbox_thickness
                 )
             
             result_dict['image_with_boxes'] = img_rgb

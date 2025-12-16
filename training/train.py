@@ -5,16 +5,26 @@ import torch
 
 
 def train_thermal_model(
-    data_yaml: str = "thermal.yaml",
-    model_size: str = "n",
-    epochs: int = 100,
-    imgsz: int = 416,
-    batch: int = 16,
+    data_yaml: str = None,
+    model_size: str = None,
+    epochs: int = None,
+    imgsz: int = None,
+    batch: int = None,
     device: str = None,
     project: str = "training/runs",
     name: str = "thermal_detection",
     **kwargs
 ):
+    if data_yaml is None:
+        data_yaml = os.getenv("TRAINING_DATA_YAML", "thermal.yaml")
+    if model_size is None:
+        model_size = os.getenv("TRAINING_DEFAULT_MODEL_SIZE", "n")
+    if epochs is None:
+        epochs = int(os.getenv("TRAINING_DEFAULT_EPOCHS", "100"))
+    if imgsz is None:
+        imgsz = int(os.getenv("TRAINING_DEFAULT_IMGSZ", "416"))
+    if batch is None:
+        batch = int(os.getenv("TRAINING_DEFAULT_BATCH", "16"))
     if device is None:
         if torch.backends.mps.is_available():
             device = "mps"
