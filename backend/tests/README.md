@@ -15,30 +15,32 @@ tests/
 
 ## Запуск тестов
 
+> **Примечание**: Если команда `pytest` не найдена, используйте `python -m pytest` вместо этого.
+
 ### Все тесты
 ```bash
 cd backend
-pytest tests/ -v
+python -m pytest tests/ -v
 ```
 
 ### Только unit тесты
 ```bash
-pytest tests/unit/ -v
+python -m pytest tests/unit/ -v
 ```
 
 ### Только integration тесты
 ```bash
-pytest tests/integration/ -v
+python -m pytest tests/integration/ -v
 ```
 
 ### С покрытием кода
 ```bash
-pytest tests/ -v --cov=app --cov-report=html
+python -m pytest tests/ -v --cov=app --cov-report=html
 ```
 
 ### Конкретный тест
 ```bash
-pytest tests/unit/test_storage.py::test_create_job_with_unique_name -v
+python -m pytest tests/unit/test_storage.py::test_create_job_with_unique_name -v
 ```
 
 ## Фикстуры
@@ -77,7 +79,7 @@ pytest tests/unit/test_storage.py::test_create_job_with_unique_name -v
 
 Для просмотра отчета:
 ```bash
-pytest tests/ --cov=app --cov-report=html
+python -m pytest tests/ --cov=app --cov-report=html
 open htmlcov/index.html
 ```
 
