@@ -20,7 +20,7 @@ PythonProject/
 │   │   ├── storage.py    # Управление хранилищем
 │   │   └── models.py    # Pydantic модели
 │   └── environment.yml   # Conda окружение
-├── frontend/             # Frontend (Этап 2)
+
 └── jobs/                 # Временное хранилище задач
 ```
 
