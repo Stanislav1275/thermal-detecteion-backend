@@ -72,7 +72,7 @@ class ThermalDetector:
 
         try:
             results = self.model.predict(
-                image_path, conf=confidence, device=self.device, verbose=False
+                image_path, conf=confidence, device=self.device, verbose=False, save=False
             )
         except Exception as e:
             error_msg = str(e)

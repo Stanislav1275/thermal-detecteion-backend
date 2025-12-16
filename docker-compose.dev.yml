@@ -2,35 +2,10 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
-    container_name: thermal-detection-api
-    ports:
-      - "8000:8000"
-    volumes:
-      # Монтирование обученной модели
-      - ./training/models:/app/models:ro
-      # Монтирование директории для временных файлов
-      - ./jobs:/app/jobs
-    environment:
-      - MODEL_PATH=/app/models/best.pt
-      - STORAGE_DIR=/app/jobs
-      - PYTHONUNBUFFERED=1
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # Development service with hot-reload
-  backend-dev:
-    build:
-      context: ./backend
       dockerfile: Dockerfile.dev
     container_name: thermal-detection-api-dev
     ports:
-      - "8001:8000"
+      - "8000:8000"
     volumes:
       # Монтирование кода приложения для hot-reload
       - ./backend/app:/app/app:ro
@@ -43,8 +18,6 @@ services:
       - STORAGE_DIR=/app/jobs
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
-    profiles:
-      - dev
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s

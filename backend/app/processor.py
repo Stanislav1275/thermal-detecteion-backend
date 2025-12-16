@@ -32,7 +32,20 @@ class ImageProcessor:
             if test_img.size == 0:
                 raise ValueError(f"Изображение пустое: {image_path}")
 
-            result = self.detector.detect(image_path, confidence=confidence, return_image=False)
+            import shutil
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(
+                delete=False, suffix=os.path.splitext(image_path)[1]
+            ) as tmp_file:
+                tmp_path = tmp_file.name
+                shutil.copy(image_path, tmp_path)
+
+            try:
+                result = self.detector.detect(tmp_path, confidence=confidence, return_image=False)
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
 
             detections = []
             for det in result["detections"]:
