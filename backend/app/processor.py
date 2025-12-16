@@ -35,25 +35,22 @@ class ImageProcessor:
             result = self.detector.detect(
                 image_path,
                 confidence=confidence,
-                return_image=True
+                return_image=False
             )
             
             detections = []
             for det in result['detections']:
+                det_confidence = det['confidence']
+                if confidence is not None and det_confidence < confidence:
+                    continue
                 detections.append(Detection(
                     bbox=det['bbox'],
-                    confidence=det['confidence'],
+                    confidence=det_confidence,
                     class_name=det.get('class_name', det.get('class', 'person'))
                 ))
             
-            if result['total_detections'] > 0:
-                if 'image_with_boxes' in result:
-                    img_with_boxes = result['image_with_boxes']
-                    img_bgr = cv2.cvtColor(img_with_boxes, cv2.COLOR_RGB2BGR)
-                    cv2.imwrite(output_path, img_bgr)
-                else:
-                    import shutil
-                    shutil.copy(image_path, output_path)
+            import shutil
+            shutil.copy(image_path, output_path)
             
             return ImageResult(
                 filename=os.path.basename(image_path),

@@ -16,7 +16,7 @@ class ThermalDetector:
         if model_path is None:
             model_path = os.getenv("MODEL_PATH", "training/models/best.pt")
         if confidence_threshold is None:
-            confidence_threshold = float(os.getenv("DEFAULT_CONFIDENCE_THRESHOLD", "0.5"))
+            confidence_threshold = float(os.getenv("DEFAULT_CONFIDENCE_THRESHOLD", "0.66"))
         self.confidence_threshold = confidence_threshold
         
         if device is None:
@@ -100,7 +100,7 @@ class ThermalDetector:
                     cls_id_int = int(cls_id)
                     conf_float = float(conf)
                     
-                    if cls_id_int == self.person_class_id:
+                    if cls_id_int == self.person_class_id and conf_float >= confidence:
                         x1, y1, x2, y2 = box.tolist()
                         detections.append({
                             'bbox': [int(x1), int(y1), int(x2), int(y2)],

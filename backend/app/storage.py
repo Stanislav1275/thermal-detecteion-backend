@@ -43,7 +43,7 @@ class JobStorage:
         self,
         job_id: Optional[str] = None,
         name: Optional[str] = None,
-        confidence_threshold: float = 0.5,
+        confidence_threshold: float = 0.62,
         total_images: int = 0
     ) -> str:
         if job_id is None:
@@ -277,4 +277,33 @@ class JobStorage:
         
         with open(manifest_path, 'w') as f:
             json.dump(manifest, f, indent=2)
+    
+    def delete_job(self, job_id: str) -> bool:
+        """
+        Удаляет задачу и все связанные с ней данные.
+        Удаляет всю директорию задачи, включая:
+        - input/ - оригинальные изображения
+        - output/ - обработанные изображения
+        - detections.json - файл с детекциями
+        - manifest.json - манифест задачи
+        - results_*.zip - ZIP архивы результатов
+        
+        Args:
+            job_id: ID задачи для удаления
+        
+        Returns:
+            bool: True если задача была удалена, False если не найдена или произошла ошибка
+        """
+        job_dir = self.base_dir / job_id
+        
+        if not job_dir.exists():
+            return False
+        
+        import shutil
+        try:
+            shutil.rmtree(job_dir)
+            return True
+        except Exception as e:
+            print(f"Ошибка при удалении задачи {job_id}: {e}")
+            return False
 

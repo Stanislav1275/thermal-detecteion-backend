@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 from typing import List, Optional
 from datetime import datetime
 
@@ -14,6 +14,14 @@ class ImageResult(BaseModel):
     detections: List[Detection] = Field(default_factory=list, description="Список детекций")
     success: bool = Field(default=True, description="Успешность обработки")
     error: Optional[str] = Field(default=None, description="Сообщение об ошибке (если есть)")
+    original_image_url: Optional[str] = Field(default=None, description="URL для получения оригинального изображения")
+    processed_image_url: Optional[str] = Field(default=None, description="URL для получения обработанного изображения")
+    
+    @computed_field
+    @property
+    def total_detections(self) -> int:
+        """Количество детекций на изображении."""
+        return len(self.detections)
 
 
 class JobStatus(BaseModel):
@@ -41,4 +49,9 @@ class UploadResponse(BaseModel):
 
 class UpdateJobNameRequest(BaseModel):
     name: str = Field(..., description="Новое имя задачи")
+
+
+class DeleteJobResponse(BaseModel):
+    message: str = Field(..., description="Сообщение об успешном удалении")
+    job_id: str = Field(..., description="ID удаленной задачи")
 

@@ -215,6 +215,93 @@ def test_get_job_status_not_found(client):
     assert response.status_code == 404
 
 
+def test_get_job_status_returns_confidence_threshold(client, temp_storage):
+    """Тест, что GET /api/jobs/{job_id} возвращает confidence_threshold в parameters."""
+    import app.main
+    original_storage = app.main.storage
+    app.main.storage = temp_storage
+    
+    try:
+        job_id = temp_storage.create_job(confidence_threshold=0.85, name="TestTask", total_images=3)
+        
+        response = client.get(f"/api/jobs/{job_id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert 'parameters' in data
+        assert 'confidence_threshold' in data['parameters']
+        assert data['parameters']['confidence_threshold'] == 0.85
+    finally:
+        app.main.storage = original_storage
+
+
+def test_list_jobs_returns_confidence_threshold(client, temp_storage):
+    """Тест, что GET /api/jobs возвращает confidence_threshold в parameters для всех задач."""
+    import app.main
+    original_storage = app.main.storage
+    app.main.storage = temp_storage
+    
+    try:
+        job_id1 = temp_storage.create_job(confidence_threshold=0.7, name="Task1", total_images=1)
+        job_id2 = temp_storage.create_job(confidence_threshold=0.9, name="Task2", total_images=2)
+        
+        response = client.get("/api/jobs")
+        assert response.status_code == 200
+        jobs = response.json()
+        assert len(jobs) >= 2
+        
+        job1 = next((j for j in jobs if j['job_id'] == job_id1), None)
+        job2 = next((j for j in jobs if j['job_id'] == job_id2), None)
+        
+        assert job1 is not None
+        assert job2 is not None
+        assert 'parameters' in job1
+        assert 'parameters' in job2
+        assert job1['parameters']['confidence_threshold'] == 0.7
+        assert job2['parameters']['confidence_threshold'] == 0.9
+    finally:
+        app.main.storage = original_storage
+
+
+def test_upload_with_confidence_threshold_saves_to_manifest(client, temp_storage, test_image_file, mock_detector_and_processor):
+    """Тест, что при загрузке изображения с порогом, порог сохраняется в manifest."""
+    import app.main
+    original_storage = app.main.storage
+    app.main.storage = temp_storage
+    
+    mock_detector, mock_processor = mock_detector_and_processor
+    
+    from app.models import ImageResult, Detection
+    mock_result = ImageResult(
+        filename=test_image_file.name,
+        detections=[Detection(bbox=[10, 20, 100, 200], confidence=0.85, class_name="person")],
+        success=True
+    )
+    
+    mock_processor.process_image.return_value = mock_result
+    mock_processor.sanitize_filename.return_value = test_image_file.name
+    mock_processor.validate_image_format.return_value = True
+    mock_processor.is_zip_file.return_value = False
+    mock_processor.load_image.return_value = None
+    
+    try:
+        with open(test_image_file, 'rb') as f:
+            files = {'files': (test_image_file.name, f, 'image/jpeg')}
+            data = {'confidence_threshold': '0.62', 'name': 'TestTask'}
+            
+            response = client.post("/api/upload", files=files, data=data)
+            assert response.status_code == 200
+            result = response.json()
+            job_id = result['job_id']
+            
+            status = temp_storage.get_status(job_id)
+            assert status is not None
+            assert 'parameters' in status
+            assert 'confidence_threshold' in status['parameters']
+            assert status['parameters']['confidence_threshold'] == 0.62
+    finally:
+        app.main.storage = original_storage
+
+
 def test_update_job_name(client, temp_storage):
     """Тест переименования задачи."""
     import app.main
@@ -304,4 +391,167 @@ def test_get_job_results_only_with_detections(client, temp_storage):
         assert data['images'][0]['filename'] == "test1.jpg"
     finally:
         app.main.storage = original_storage
+
+
+def test_delete_job(client, temp_storage):
+    """Тест удаления задачи."""
+    import app.main
+    original_storage = app.main.storage
+    app.main.storage = temp_storage
+    
+    try:
+        job_id = temp_storage.create_job(name="TestTask", total_images=1)
+        
+        response = client.delete(f"/api/jobs/{job_id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data['message'] == "Задача успешно удалена"
+        assert data['job_id'] == job_id
+        
+        status_response = client.get(f"/api/jobs/{job_id}")
+        assert status_response.status_code == 404
+    finally:
+        app.main.storage = original_storage
+
+
+def test_delete_job_not_found(client):
+    """Тест удаления несуществующей задачи."""
+    response = client.delete("/api/jobs/nonexistent-id")
+    assert response.status_code == 404
+    assert "не найдена" in response.json()['detail']
+
+
+def test_job_results_counting_with_errors(client, temp_storage):
+    """Тест подсчёта статистики с ошибками обработки."""
+    import app.main
+    original_storage = app.main.storage
+    app.main.storage = temp_storage
+    
+    try:
+        job_id = temp_storage.create_job(total_images=3)
+        
+        from app.models import ImageResult, Detection
+        detections = [
+            ImageResult(
+                filename="test1.jpg",
+                detections=[Detection(bbox=[10, 20, 100, 200], confidence=0.8, class_name="person")],
+                success=True
+            ),
+            ImageResult(
+                filename="test2.jpg",
+                detections=[],
+                success=True
+            ),
+            ImageResult(
+                filename="test3.jpg",
+                detections=[],
+                success=False,
+                error="Ошибка обработки"
+            )
+        ]
+        
+        temp_storage.save_detections(job_id, detections)
+        temp_storage.update_status(job_id, "completed", processed_images=3, images_with_detections=1)
+        
+        response = client.get(f"/api/jobs/{job_id}/results")
+        assert response.status_code == 200
+        data = response.json()
+        
+        metadata = data['metadata']
+        assert metadata['total_images'] == 3
+        assert metadata['total_images_with_people'] == 1
+        assert metadata['total_errors'] == 1
+        assert metadata['total_detections'] == 1
+        
+        status_response = client.get(f"/api/jobs/{job_id}")
+        assert status_response.status_code == 200
+        status_data = status_response.json()
+        
+        assert status_data['processed_images'] == 3
+        assert status_data['images_with_detections'] == 1
+        assert status_data['total_images'] == 3
+        
+        assert metadata['total_images'] == status_data['processed_images']
+    finally:
+        app.main.storage = original_storage
+
+
+def test_job_results_counting_consistency(client, temp_storage):
+    """Тест консистентности подсчёта между JobStatus и JobResults."""
+    import app.main
+    original_storage = app.main.storage
+    app.main.storage = temp_storage
+    
+    try:
+        job_id = temp_storage.create_job(total_images=5)
+        
+        from app.models import ImageResult, Detection
+        detections = [
+            ImageResult(
+                filename=f"test{i}.jpg",
+                detections=[Detection(bbox=[10, 20, 100, 200], confidence=0.8, class_name="person")] if i < 2 else [],
+                success=i < 4,
+                error="Ошибка" if i >= 4 else None
+            )
+            for i in range(5)
+        ]
+        
+        temp_storage.save_detections(job_id, detections)
+        temp_storage.update_status(job_id, "completed", processed_images=5, images_with_detections=2)
+        
+        status_response = client.get(f"/api/jobs/{job_id}")
+        results_response = client.get(f"/api/jobs/{job_id}/results")
+        
+        assert status_response.status_code == 200
+        assert results_response.status_code == 200
+        
+        status = status_response.json()
+        results = results_response.json()
+        
+        assert status['processed_images'] == results['metadata']['total_images']
+        assert status['images_with_detections'] == results['metadata']['total_images_with_people']
+        assert results['metadata']['total_errors'] == 1
+        assert results['metadata']['total_images'] == 5
+    finally:
+        app.main.storage = original_storage
+
+
+def test_imageresult_total_detections_in_response(client, temp_storage):
+    """Тест наличия total_detections в ответе API."""
+    import app.main
+    original_storage = app.main.storage
+    app.main.storage = temp_storage
+    
+    try:
+        job_id = temp_storage.create_job(total_images=1)
+        
+        from app.models import ImageResult, Detection
+        detections = [
+            ImageResult(
+                filename="test.jpg",
+                detections=[
+                    Detection(bbox=[10, 20, 100, 200], confidence=0.8, class_name="person"),
+                    Detection(bbox=[150, 160, 250, 300], confidence=0.9, class_name="person")
+                ],
+                success=True
+            )
+        ]
+        
+        temp_storage.save_detections(job_id, detections)
+        temp_storage.update_status(job_id, "completed")
+        
+        response = client.get(f"/api/jobs/{job_id}/results")
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert len(data['images']) == 1
+        image_result = data['images'][0]
+        assert 'total_detections' in image_result or hasattr(image_result, 'total_detections')
+        
+        from app.models import ImageResult as IR
+        parsed = IR(**image_result)
+        assert parsed.total_detections == 2
+    finally:
+        app.main.storage = original_storage
+
 

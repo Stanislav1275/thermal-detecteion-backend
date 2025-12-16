@@ -1,11 +1,11 @@
 import os
 from pathlib import Path
 from typing import List, Optional
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from .models import UploadResponse, JobStatus, JobResults, ImageResult, UpdateJobNameRequest
+from .models import UploadResponse, JobStatus, JobResults, ImageResult, UpdateJobNameRequest, DeleteJobResponse
 from .detector import ThermalDetector
 from .processor import ImageProcessor
 from .storage import JobStorage
@@ -78,7 +78,7 @@ async def health_check():
     }
 
 
-DEFAULT_CONFIDENCE = float(os.getenv("DEFAULT_CONFIDENCE_THRESHOLD", "0.5"))
+DEFAULT_CONFIDENCE = float(os.getenv("DEFAULT_CONFIDENCE_THRESHOLD", "0.66"))
 
 
 def validate_confidence(confidence: float) -> None:
@@ -98,7 +98,7 @@ def validate_confidence(confidence: float) -> None:
 async def upload_images(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(...),
-    confidence_threshold: float = Form(DEFAULT_CONFIDENCE),
+    confidence_threshold: Optional[str] = Form(None),
     name: Optional[str] = Form(None)
 ):
     if detector is None or processor is None:
@@ -113,7 +113,18 @@ async def upload_images(
             detail="Нет загруженных файлов"
         )
     
-    validate_confidence(confidence_threshold)
+    if confidence_threshold is None:
+        confidence_value = DEFAULT_CONFIDENCE
+    else:
+        try:
+            confidence_value = float(confidence_threshold)
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=400,
+                detail=f"confidence_threshold должен быть числом, получено: {confidence_threshold}"
+            )
+    
+    validate_confidence(confidence_value)
     
     import uuid
     temp_dir_name = f"temp_upload_{uuid.uuid4().hex[:8]}"
@@ -158,7 +169,7 @@ async def upload_images(
         
         job_id = storage.create_job(
             name=name,
-            confidence_threshold=confidence_threshold,
+            confidence_threshold=confidence_value,
             total_images=len(all_image_files)
         )
         
@@ -166,7 +177,7 @@ async def upload_images(
             process_images_from_paths_task,
             job_id=job_id,
             image_paths=all_image_files,
-            confidence_threshold=confidence_threshold,
+            confidence_threshold=confidence_value,
             temp_dir=temp_dir_name
         )
         
@@ -201,10 +212,21 @@ async def process_images_from_paths_task(
         results = []
         processed_count = 0
         detections_count = 0
+        used_filenames = {}  # Словарь для отслеживания использованных имен файлов
         
         for image_path in image_paths:
             try:
-                filename = processor.sanitize_filename(os.path.basename(image_path))
+                base_filename = processor.sanitize_filename(os.path.basename(image_path))
+                
+                # Обработка дубликатов имен файлов
+                if base_filename in used_filenames:
+                    used_filenames[base_filename] += 1
+                    base, ext = os.path.splitext(base_filename)
+                    filename = f"{base}_{used_filenames[base_filename]}{ext}"
+                else:
+                    used_filenames[base_filename] = 0
+                    filename = base_filename
+                
                 input_path = input_dir / filename
                 
                 import shutil
@@ -216,6 +238,9 @@ async def process_images_from_paths_task(
                     str(output_path),
                     confidence=confidence_threshold
                 )
+                
+                # Обновляем filename в результате на уникальное имя
+                result.filename = filename
                 
                 results.append(result)
                 processed_count += 1
@@ -234,8 +259,17 @@ async def process_images_from_paths_task(
                 )
             
             except Exception as e:
+                base_filename = processor.sanitize_filename(os.path.basename(image_path))
+                if base_filename in used_filenames:
+                    used_filenames[base_filename] += 1
+                    base, ext = os.path.splitext(base_filename)
+                    filename = f"{base}_{used_filenames[base_filename]}{ext}"
+                else:
+                    used_filenames[base_filename] = 0
+                    filename = base_filename
+                
                 error_result = ImageResult(
-                    filename=processor.sanitize_filename(os.path.basename(image_path)),
+                    filename=filename,
                     detections=[],
                     success=False,
                     error=str(e)
@@ -284,7 +318,7 @@ async def update_job_name(job_id: str, request: UpdateJobNameRequest):
 
 
 @app.get("/api/jobs/{job_id}/results", response_model=JobResults)
-async def get_job_results(job_id: str, only_with_detections: bool = False):
+async def get_job_results(request: Request, job_id: str, only_with_detections: bool = False):
     status = storage.get_status(job_id)
     if status is None:
         raise HTTPException(status_code=404, detail="Задача не найдена")
@@ -292,6 +326,9 @@ async def get_job_results(job_id: str, only_with_detections: bool = False):
     detections = storage.get_detections(job_id) or []
     
     from .models import Detection
+    
+    base_url = str(request.base_url).rstrip('/')
+    
     image_results = []
     for det in detections:
         detections_list = [Detection(**d) for d in det.get('detections', [])]
@@ -299,19 +336,27 @@ async def get_job_results(job_id: str, only_with_detections: bool = False):
         if only_with_detections and not detections_list:
             continue
         
+        filename = det['filename']
+        original_url = f"{base_url}/api/jobs/{job_id}/input/{filename}"
+        processed_url = f"{base_url}/api/jobs/{job_id}/output/{filename}"
+        
         image_results.append(ImageResult(
-            filename=det['filename'],
+            filename=filename,
             detections=detections_list,
             success=det.get('success', True),
-            error=det.get('error')
+            error=det.get('error'),
+            original_image_url=original_url,
+            processed_image_url=processed_url
         ))
     
     images_with_detections = [img for img in image_results if img.detections]
+    images_with_errors = [img for img in image_results if not img.success]
     
     metadata = {
         "total_detections": sum(len(img.detections) for img in image_results),
         "total_images_with_people": len(images_with_detections),
         "total_images": len(image_results),
+        "total_errors": len(images_with_errors),
         "status": status['status']
     }
     
@@ -340,6 +385,23 @@ async def get_output_image(job_id: str, filename: str, original: bool = False):
     
     mime_type = processor.get_mime_type(filename)
     return FileResponse(str(image_path), media_type=mime_type, filename=filename)
+
+
+@app.delete("/api/jobs/{job_id}", response_model=DeleteJobResponse)
+async def delete_job(job_id: str):
+    """
+    Удалить задачу и все связанные с ней данные.
+    
+    Внимание: Операция необратима. Все данные задачи будут удалены безвозвратно.
+    """
+    success = storage.delete_job(job_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Задача с ID '{job_id}' не найдена")
+    
+    return DeleteJobResponse(
+        message="Задача успешно удалена",
+        job_id=job_id
+    )
 
 
 @app.get("/api/jobs/{job_id}/download")

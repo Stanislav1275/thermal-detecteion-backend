@@ -14,7 +14,8 @@ API_PORT=${API_PORT:-8000}
 echo "🚀 Запуск FastAPI сервера..."
 echo "   API: http://localhost:${API_PORT}"
 echo "   Docs: http://localhost:${API_PORT}/docs"
+echo "   Python: $(which python)"
 echo ""
 
-uvicorn app.main:app --reload --host ${API_HOST} --port ${API_PORT}
+python -m uvicorn app.main:app --reload --host ${API_HOST} --port ${API_PORT}
 
