@@ -21,6 +21,7 @@ def test_detect_with_detections(mock_detector, test_image_path: Path):
     mock_box.xyxy = np.array([[10, 20, 100, 200], [150, 160, 250, 300]])
     mock_box.cls = np.array([0, 0])
     mock_box.conf = np.array([0.8, 0.9])
+    mock_box.__len__ = Mock(return_value=2)
     mock_result.boxes = mock_box
     mock_detector.model.predict = Mock(return_value=[mock_result])
     
@@ -59,6 +60,7 @@ def test_detect_filters_by_person_class(mock_detector, test_image_path: Path):
     mock_box.xyxy = np.array([[10, 20, 100, 200], [150, 160, 250, 300]])
     mock_box.cls = np.array([0, 1])
     mock_box.conf = np.array([0.8, 0.9])
+    mock_box.__len__ = Mock(return_value=2)
     mock_result.boxes = mock_box
     
     mock_detector.model.predict = Mock(return_value=[mock_result])
@@ -78,6 +80,7 @@ def test_detect_confidence_threshold(mock_detector, test_image_path: Path):
     mock_box.xyxy = np.array([[10, 20, 100, 200], [150, 160, 250, 300]])
     mock_box.cls = np.array([0, 0])
     mock_box.conf = np.array([0.3, 0.8])
+    mock_box.__len__ = Mock(return_value=2)
     mock_result.boxes = mock_box
     
     mock_detector.model.predict = Mock(return_value=[mock_result])
@@ -94,6 +97,7 @@ def test_detect_with_image_return(mock_detector, test_image_path: Path):
     mock_box.xyxy = np.array([[10, 20, 100, 200]])
     mock_box.cls = np.array([0])
     mock_box.conf = np.array([0.8])
+    mock_box.__len__ = Mock(return_value=1)
     mock_result.boxes = mock_box
     mock_detector.model.predict = Mock(return_value=[mock_result])
     

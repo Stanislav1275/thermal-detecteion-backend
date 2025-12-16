@@ -108,6 +108,16 @@ def test_load_image(temp_dir: Path):
 
 def test_process_image_with_detections(mock_processor, test_image_path: Path, temp_dir: Path):
     """Тест обработки изображения с детекциями."""
+    from unittest.mock import Mock
+    
+    mock_processor.detector.detect = Mock(return_value={
+        'detections': [
+            {'bbox': [10, 20, 100, 200], 'confidence': 0.8, 'class_name': 'person'}
+        ],
+        'total_detections': 1,
+        'image_with_boxes': np.random.randint(0, 255, (416, 416, 3), dtype=np.uint8)
+    })
+    
     output_path = temp_dir / "output.jpg"
     
     result = mock_processor.process_image(

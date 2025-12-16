@@ -53,6 +53,7 @@ def mock_yolo_model():
     mock_box.xyxy = np.array([[10, 20, 100, 200], [150, 160, 250, 300]])
     mock_box.cls = np.array([0, 0])
     mock_box.conf = np.array([0.8, 0.9])
+    mock_box.__len__ = Mock(return_value=2)
     mock_result.boxes = mock_box
     mock_result.boxes.xyxy = mock_box.xyxy
     mock_result.boxes.cls = mock_box.cls
@@ -74,13 +75,20 @@ def mock_detector(mock_yolo_model, monkeypatch):
         detector.person_class_id = 0
         detector.device = "cpu"
         detector.confidence_threshold = 0.5
-        detector.detect = Mock(return_value={
-            'detections': [
-                {'bbox': [10, 20, 100, 200], 'confidence': 0.8, 'class_name': 'person'},
-                {'bbox': [150, 160, 250, 300], 'confidence': 0.9, 'class_name': 'person'}
-            ],
-            'total_detections': 2
-        })
+        
+        def mock_detect(image_path, confidence=None, return_image=False):
+            result = {
+                'detections': [
+                    {'bbox': [10, 20, 100, 200], 'confidence': 0.8, 'class_name': 'person'},
+                    {'bbox': [150, 160, 250, 300], 'confidence': 0.9, 'class_name': 'person'}
+                ],
+                'total_detections': 2
+            }
+            if return_image:
+                result['image_with_boxes'] = np.random.randint(0, 255, (416, 416, 3), dtype=np.uint8)
+            return result
+        
+        detector.detect = mock_detect
         return detector
     
     def mock_init(self, model_path=None, confidence_threshold=None, device=None):
