@@ -16,7 +16,7 @@ class ThermalDetector:
         if model_path is None:
             model_path = os.getenv("MODEL_PATH", "training/models/best.pt")
         if confidence_threshold is None:
-            confidence_threshold = float(os.getenv("DEFAULT_CONFIDENCE_THRESHOLD", "0.66"))
+            confidence_threshold = float(os.getenv("DEFAULT_CONFIDENCE_THRESHOLD", "0.36"))
         self.confidence_threshold = confidence_threshold
         
         if device is None:
